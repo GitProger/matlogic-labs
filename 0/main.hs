@@ -1,7 +1,6 @@
+import Utils
 import Lexer
 import Parser
-
-(~>) = flip (.)
   
 cantorNormalForm = id
 

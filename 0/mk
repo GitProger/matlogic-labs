@@ -2,6 +2,6 @@
 
 alex lexer.x
 happy parser.y
-ghc lexer parser main
+ghc lexer utils parser main
 rm lexer.hs parser.hs *.hi *.o
 
