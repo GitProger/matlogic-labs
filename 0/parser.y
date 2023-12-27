@@ -33,10 +33,10 @@ Adding:     Muling                    { $1 }
             | Adding "*" Muling       { Call Mul $1 $3 }
 
 Muling:     Term                      { $1 }
-            | Term "^" Muling      { Call Pow $1 $3 }
+            | Term "^" Muling         { Call Pow $1 $3 }
 
 Term:       "w"                       { Omega }
-            | NAT                     { Ordinal $1 }
+            | NAT                     { Number $1 }
             | "(" Expression ")"      { $2 }
 
 {
@@ -49,9 +49,9 @@ instance Show BiOper where
     Pow -> "^"
     Equ -> "="
 
-data Expression = Ordinal Int | Omega | Call BiOper Expression Expression deriving Eq
+data Expression = Number Int | Omega | Call BiOper Expression Expression deriving Eq
 instance Show Expression where
-  show (Ordinal v) = show v
+  show (Number v) = show v
   show Omega = "w"
   show (Call op a b) = "(" ++ show op ++ "," ++ show a ++ "," ++ show b ++ ")"
 
