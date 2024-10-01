@@ -5,9 +5,7 @@ import Parser
 import Utils
 import Data.Maybe
 import Data.List (sort, find, intercalate)
-import qualified Data.Vector as VC
 import qualified Data.Map as M
-import qualified Control.Monad as MD
 
 type Indexed a = (Int, a)
 type Twice a = (a, a)
@@ -26,8 +24,6 @@ modusPonens (ProofLine c1 a) (ProofLine c2 (Call Imply a' b)) =
     then Just (ProofLine c1 b)
     else Nothing
 modusPonens _ _ = Nothing
-
-cabBeDeductedFast cacheExt i j = (cacheExt VC.! (i - 1)) == (cacheExt VC.! (j - 1))
 
 -- isX: -----------------------------------------------------------------------
 isModusPonens a b res = (Just res) == modusPonens a b
