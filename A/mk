@@ -1,8 +1,0 @@
-#!/usr/bin/bash
-
-alex lexer.x
-happy parser.y
-ghc lexer parser localutils main
-if [[ $? == 0 ]]; then
-    rm lexer.hs parser.hs *.hi *.o
-fi
