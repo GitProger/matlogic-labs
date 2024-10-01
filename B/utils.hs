@@ -23,6 +23,13 @@ takeLastRet f (h:t) = case f h of
   Just r  -> Just r
   Nothing -> takeLastRet f t
 
+
+double :: (a -> a) -> ((a, a) -> (a, a))
+double f = \(a, b) -> (f a, f b)
+
+double2 :: (a -> a -> a) -> ((a, a) -> (a, a) -> (a, a))
+double2 f = \(a1, b1) (a2, b2) -> (f a1 a2, f b1 b2)
+
 -------------------
 -- lexer helper: --
 data LogicToken = VarTkn String 
@@ -61,14 +68,14 @@ instance Show Expr where
 
 -------------------------------------------------------------------------------
 
-data Context = Context [Expr] deriving Eq
+data Context = Context [Expr] deriving (Eq, Ord)
 instance Show Context where
   show (Context e) = join "," e
 
 -- cmpUnord (Context a) (Context b) = sort a == sort b
 
 
-data ProofLine = ProofLine Context Expr deriving Eq
+data ProofLine = ProofLine Context Expr deriving (Eq, Ord)
 instance Show ProofLine where
   show (ProofLine ctx e) = show ctx ++ show Dash ++ show e
 

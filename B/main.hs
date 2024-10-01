@@ -3,11 +3,22 @@
 import Lexer
 import Parser
 import Utils
-import Data.List (sort, find)
+import Data.Maybe
+import Data.List (sort, find, intercalate)
 import qualified Data.Vector as VC
+import qualified Data.Map as M
+import qualified Control.Monad as MD
+
+type Indexed a = (Int, a)
+type Twice a = (a, a)
 
 verify :: Eq a => [(a, a)] -> Bool
 verify = all (uncurry (==))
+
+isImplication (ProofLine _ (Call Imply _ _)) = True
+isImplication _ = False 
+
+-------------------------------------------------------------------------------
 
 modusPonens (ProofLine c1 a) (ProofLine c2 (Call Imply a' b)) =
   -- if c1 `cmpUnord` c2 && a == a'
@@ -16,30 +27,10 @@ modusPonens (ProofLine c1 a) (ProofLine c2 (Call Imply a' b)) =
     else Nothing
 modusPonens _ _ = Nothing
 
--------------------------------------------------------------------------------
--- deduction variants: --------------------------------------------------------
--- deduct (ProofLine (Context (c1:cn)) e) = ProofLine (Context cn) $ Call Imply c1 e
--- deduct e = e
-
--- cabBeDeducted from to
---   | df == to   = True
---   | df == from = False
---   | otherwise  = cabBeDeducted df to
---   where df = deduct from
-
--- cabBeDeductedExt a b = cabBeDeducted a b || cabBeDeducted b a
-
--- cabBeDeducted' from to = 
---   let ProofLine c1 e1 = expandCtx from
---       ProofLine c2 e2 = expandCtx to in 
---     e1 == e2 && c1 `cmpUnord` c2
-
-cabBeDeductedFast cache i j = (cache VC.! (i - 1)) == (cache VC.! (j - 1))
+cabBeDeductedFast cacheExt i j = (cacheExt VC.! (i - 1)) == (cacheExt VC.! (j - 1))
 
 -- isX: -----------------------------------------------------------------------
-isModusPonens p1 p2 (ProofLine c' e') = case modusPonens p1 p2 of 
-  Just (ProofLine c e) -> e == e' && c == c' -- c `cmpUnord` c'
-  Nothing -> False
+isModusPonens a b res = (Just res) == modusPonens a b
 
 isAxiom :: ProofLine -> Maybe MarkedExpr
 isAxiom line@(ProofLine _ e) = case axiomEnumerate e of 
@@ -60,44 +51,68 @@ test ((Just ok):t) _ = ok
 test (Nothing:t) bad = test t bad 
 --------------------------------------------------------------------------------
 
-findDeduction cache entire (i, line) = if i <= 1 then Nothing else
-  takeLastRet (\(j, prev) -> 
-                -- if cabBeDeducted' prev line
-                if cabBeDeductedFast cache j i
-                  then Just $ Deducted line j
-                  else Nothing)
-              $ takeWhile ((<i) . fst) entire
+findDeduction :: M.Map Context [Indexed ProofLine] -> Indexed ProofLine -> Maybe MarkedExpr
+findDeduction extCache (i, line) = if i <= 1 then Nothing else
+  let (ProofLine ctx expr) = withSortedCtx $ expandCtx line
+      a = filter (\(j, ProofLine _ e) -> j < i && e == expr) $ (extCache M.! ctx) in
+    if a == [] 
+      then Nothing
+      else let (j, _) = head a in 
+            Just $ Deducted line j
 
-findModusPonens entire (i, line@(ProofLine ctx e)) = if i <= 2 then Nothing else
-  let candidates = filter ((== ctx) . getContext . snd) -- (cmpUnord ctx)
-                        $ takeWhile ((<i) . fst) entire
-      isImplication (ProofLine _ (Call Imply _ _)) = True
-      isImplication _ = False 
-
-      -- a, a -> b |= b ; look for (->)
-      implications = filter (isImplication . snd) candidates
-  in
+findModusPonens ctxCache (k, line@(ProofLine ctx e)) = if k <= 2 then Nothing else
+  let (candidates, implications) = ctxCache M.! ctx in
     takeLastRet (\(j, b) -> -- a := a', b := a' -> b'
-                  case find (\(i, a) -> isModusPonens a b line) candidates of  
-                    Just (i, _) -> Just $ MP line i j
-                    Nothing -> Nothing)
+                  if j >= k then Nothing else 
+                    case find (\(i, a) -> i < k && isModusPonens a b line) candidates of  
+                      Just (i, _) -> Just $ MP line i j
+                      Nothing -> Nothing)
                 implications
 
-check :: [(Int, ProofLine)] -> VC.Vector ProofLine -> (Int, ProofLine) -> MarkedExpr
-check entire cache (i, line) = 
+check :: M.Map Context (Twice [Indexed ProofLine]) -> M.Map Context [Indexed ProofLine]
+                                                   -> Indexed ProofLine -> MarkedExpr
+check ctxCache extCache (i, line) = 
   test [ isAxiom line
        , isHypotize line
-       , findDeduction cache entire' (i, line')
-       , findModusPonens entire' (i, line') 
-       ] $ Incorrect line 
-      where entire' = map (\(i, p) -> (i, withSortedCtx p)) entire
-            line' = withSortedCtx line
+       , findDeduction extCache (i, line')
+       , findModusPonens ctxCache (i, line') 
+       ] $ Incorrect line
+      where line' = withSortedCtx line
+
+            --      all                 implications
+updatePair :: Twice [Indexed ProofLine] -> Indexed ProofLine -> Twice [Indexed ProofLine]
+updatePair (alL, implications) e@(i, pl) = 
+  (e:alL, if isImplication pl then e:implications else implications)
+
+withImpl new@(_, p) = ([new], if isImplication p then [new] else [])
+
+getCtxCache :: [Indexed ProofLine] -> M.Map Context (Twice [Indexed ProofLine])
+getCtxCache indexed = 
+  M.map (double reverse) $ foldl (\mp new@(i, (ProofLine ctx _)) -> 
+                                   -- case mp M.!? ctx of 
+                                   --   Nothing -> M.insert ctx (updatePair ([], []) new) mp
+                                   --   Just old -> M.insert ctx (updatePair old new) mp
+
+                                   -- M.update (\old -> Just $ updatePair old new) ctx mp)
+                                   M.insertWith (double2 (++)) ctx (withImpl new) mp
+                                 ) M.empty indexed 
+
+
+getExtCache :: [Indexed ProofLine] -> M.Map Context [Indexed ProofLine]
+getExtCache indexed = 
+  M.map reverse $ foldl (\mp new@(i, (ProofLine ctx _)) -> M.insertWith (++) ctx [new] mp) M.empty indexed
 
 main :: IO ()
-main = getContents >>= return . map (parseProof . alexScanTokens) . lines >>= \strs ->
-  let indexed = zip [1..] strs
-      cache = VC.fromList $ map (withSortedCtx . expandCtx) strs
-      ans = map (check indexed cache) indexed in
+main = do 
+  input <- getContents >>= return . lines
+  let strs = map (parseProof . alexScanTokens) input
+      indexed = zip [1..] strs
+
+      extCache = getExtCache $ zip [1..] $ map (withSortedCtx . expandCtx) strs
+      ctxCache = getCtxCache $ map (\(i, p) -> (i, withSortedCtx p)) indexed
+
+      ans = map (check ctxCache extCache) indexed in
+    --putStrLn $ intercalate "\n" $ map (\(k, v) -> show k ++ "    ->   " ++ show v) $ M.toAscList extCache
     putStr . unlines $ zipWith3 (\i orig res -> numbered i $ show $ withProofLine orig res) [1..] strs ans
 
 
