@@ -1,0 +1,6 @@
+A->B,C,D|-E->D
+A->B,C,D,D|-D
+A->B,C,D,D|-D->E
+A->B,C,D|-E
+D,A->B,C,D|-E
+E,D,C|-(A->B)->D
