@@ -1,2 +1,9 @@
 _*
 */main
+*/*.hi
+*/.vscode
+*/parser.hs
+*/lexer.hs
+
+*.o
+*.zip

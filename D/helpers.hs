@@ -4,6 +4,7 @@ module Helpers where
 import Data.List (elem)
 import Utils
 import Base
+import Text.Blaze.Svg11.Attributes (x)
 
 --                expr     ctx      proof left, t/f     proof right, t/f       new proof, t/f
 proofOperation :: Expr -> [Expr] -> (ProofTree, Bool) -> (ProofTree, Bool) -> (ProofTree, Bool)
@@ -40,30 +41,31 @@ rev x = (x .-> _I_)
 nn   x = ((rev x) .-> _I_)
 ornq x = (x .| (rev x))
 ornnq x ctx = (Ax (x .| (rev x) .-> _I_) ctx)
+both x = x .| (rev x)
 
 basicProof x ctx = 
-  (SingleProof ENot (ornq x) ctx (appendCtx (x .| (rev x) .-> _I_)
+  (SingleProof ENot (ornq x) ctx (appendCtx ((both x) .-> _I_)
     (DoubleProof EImpl _I_ ctx
       (DoubleProof EImpl (nn x) ctx
-        (DoubleProof EImpl ((x .| (rev x) .-> _I_) .-> (rev x) .-> _I_) ctx
-          (SingleProof IIMpl (((rev x) .-> x .| (rev x)) .-> (x .| (rev x) .-> _I_) .-> (rev x) .-> _I_) ctx 
-            (appendCtx ((rev x) .-> x .| (rev x))
-                        (SingleProof IIMpl ((x .| (rev x) .-> _I_) .-> (rev x) .-> _I_) ctx 
-                          (appendCtx (x .| (rev x) .-> _I_)
+        (DoubleProof EImpl (((both x) .-> _I_) .-> (rev x) .-> _I_) ctx
+          (SingleProof IIMpl (((rev x) .-> (both x)) .-> ((both x) .-> _I_) .-> (rev x) .-> _I_) ctx 
+            (appendCtx ((rev x) .-> (both x))
+                        (SingleProof IIMpl (((both x) .-> _I_) .-> (rev x) .-> _I_) ctx 
+                          (appendCtx ((both x) .-> _I_)
                             (SingleProof IIMpl (nn x) ctx (appendCtx (rev x)
                               (DoubleProof EImpl _I_ ctx (ornnq x ctx) (SingleProof IrOr (ornq x) ctx (Ax (rev x) ctx)))))))))
-          (SingleProof IIMpl ((rev x) .-> x .| (rev x)) ctx 
+          (SingleProof IIMpl ((rev x) .-> (both x)) ctx 
             (appendCtx (rev x) (SingleProof IrOr (ornq x) ctx (Ax (rev x) ctx)))))
         (ornnq x ctx))
       (DoubleProof EImpl (rev x) ctx
-        (DoubleProof EImpl ((x .| (rev x) .-> _I_) .-> (rev x)) ctx
-          (SingleProof IIMpl ((x .-> x .| (rev x)) .-> (x .| (rev x) .-> _I_) .-> (rev x)) ctx 
-            (appendCtx (x .-> x .| (rev x)) 
-                        (SingleProof IIMpl ((x .| (rev x) .-> _I_) .-> (rev x)) ctx
-                          (appendCtx (x .| (rev x) .-> _I_) 
+        (DoubleProof EImpl (((both x) .-> _I_) .-> (rev x)) ctx
+          (SingleProof IIMpl ((x .-> (both x)) .-> ((both x) .-> _I_) .-> (rev x)) ctx 
+            (appendCtx (x .-> (both x)) 
+                        (SingleProof IIMpl (((both x) .-> _I_) .-> (rev x)) ctx
+                          (appendCtx ((both x) .-> _I_) 
                             (SingleProof IIMpl (rev x) ctx (appendCtx x
                               (DoubleProof EImpl _I_ ctx (ornnq x ctx) (SingleProof IlOr (ornq x) ctx (Ax x ctx)))))))))
-          (SingleProof IIMpl (x .-> x .| (rev x)) ctx 
+          (SingleProof IIMpl (x .-> (both x)) ctx 
             (appendCtx x (SingleProof IlOr (ornq x) ctx (Ax x ctx)))))
         (ornnq x ctx)))))
 
